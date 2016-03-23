@@ -1,0 +1,33 @@
+- hosts: all
+  vars:
+    kafka_dir: /home/mirantis/kafka
+    zookeeper_host: "{{ hostvars[groups['zookeeper'][0]]['ansible_default_ipv4']['address'] }}"
+  tasks:
+    - name: ensuring Kafka is installed
+      unarchive: src=kafka_2.11-0.9.0.0.tgz dest={{ kafka_dir }}
+    - name: configuring Kafka
+      template: src=server.properties.j2 dest={{ kafka_dir }}/server-{{ ansible_hostname }}.properties
+- hosts: zookeeper
+  vars:
+    kafka_dir: /home/mirantis/kafka
+  tasks:
+    - name: checking whether Zookeeper is started
+      shell: ps ax | grep -i 'zookeeper' | grep java | grep -v grep | awk '{print $1}'
+      register: result_zookeeper
+    - name: starting Zookeeper
+      command: "kafka_2.11-0.9.0.0/bin/zookeeper-server-start.sh -daemon kafka_2.11-0.9.0.0/config/zookeeper.properties"
+      args:
+        chdir: "{{ kafka_dir }}"
+      when: result_zookeeper.stdout == ''
+- hosts: kafka
+  vars:
+    kafka_dir: /home/mirantis/kafka
+  tasks:
+    - name: checking whether Kafka is started
+      shell: ps ax | grep -i 'kafka\.Kafka' | grep java | grep -v grep | awk '{print $1}'
+      register: result_kafka
+    - name: starting Kafka
+      command: "kafka_2.11-0.9.0.0/bin/kafka-server-start.sh -daemon server-{{ ansible_hostname }}.properties"
+      args:
+        chdir: "{{ kafka_dir }}"
+      when: result_kafka.stdout == ''
